@@ -1,0 +1,16 @@
+git
+gcc
+g++
+python
+pkg-config [platform:ubuntu]
+libssl-dev [platform:ubuntu]
+libdbus-1-dev [platform:ubuntu]
+libglib2.0-dev [platform:ubuntu]
+libavahi-client-dev [platform:ubuntu]
+ninja-build [platform:ubuntu]
+python3-venv [platform:ubuntu]
+python3-dev [platform:ubuntu]
+python3-pip [platform:ubuntu]
+unzip
+libgirepository1.0-dev [platform:ubuntu]
+libcairo2-dev [platform:ubuntu]

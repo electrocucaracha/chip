@@ -1,0 +1,3 @@
+opt/*
+.vagrant
+super-linter.log
