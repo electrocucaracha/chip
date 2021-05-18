@@ -23,6 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Dependencies installation
-        run: cd scripts; ./install.sh
+        run: "cd scripts; curl -fsSL http://bit.ly/install_bin | bash"
       - name: Build source code
         run: cd scripts; ./build.sh

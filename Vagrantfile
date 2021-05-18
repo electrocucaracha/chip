@@ -31,7 +31,7 @@ Vagrant.configure("2") do |config|
       set -o errexit
 
       cd /vagrant/
-      ./install.sh | tee ~/install.log
+      curl -fsSL http://bit.ly/install_bin | bash
       ./build.sh | tee ~/build.log
     SHELL
   end
