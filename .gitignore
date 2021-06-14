@@ -1,3 +1,4 @@
 opt/*
 .vagrant
+*swp
 super-linter.log

@@ -14,18 +14,32 @@ if [[ "${DEBUG:-false}" == "true" ]]; then
     set -o xtrace
 fi
 
-chip_src="/opt/connectedhomeip"
+# shellcheck source=./scripts/common.sh
+source common.sh
 
 if [ ! -d "$chip_src" ]; then
     sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
     sudo chown -R "$USER": "$chip_src"
+else
+    pushd "$chip_src"
+    git submodule update --init
+    git pull origin master
+    popd
 fi
 
 pushd "$chip_src"
-git submodule update --init
-
-# shellcheck disable=SC1091
-source scripts/activate.sh
-gn gen out/host --args="is_debug=${DEBUG:-false}"
-ninja -C out/host
+rm -rf out/
 popd
+
+bootstrap
+init
+trap cleanup EXIT
+
+# Use gn to generate Ninja files
+run ./scripts/build/gn_gen.sh --args='is_debug=false'
+
+# Build source code
+run ./scripts/build/gn_build.sh
+
+# Run Tests
+run ./scripts/tests/gn_tests.sh

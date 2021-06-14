@@ -20,8 +20,8 @@ Vagrant.configure("2") do |config|
 
   config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
-  config.vm.synced_folder './scripts', '/vagrant'
-  config.vm.synced_folder './opt', '/opt'
+  config.vm.synced_folder './scripts', '/vagrant', SharedFoldersEnableSymlinksCreate: false
+  config.vm.synced_folder './opt', '/opt', create: true
 
   config.vm.provision 'shell', privileged: false do |sh|
     sh.env = {
@@ -31,15 +31,24 @@ Vagrant.configure("2") do |config|
       set -o errexit
 
       cd /vagrant/
-      curl -fsSL http://bit.ly/install_bin | bash
+      curl -fsSL http://bit.ly/install_pkg | PKG=docker bash
       ./build.sh | tee ~/build.log
     SHELL
   end
 
+  host = RbConfig::CONFIG['host_os']
+
+  if host =~ /darwin/
+    mem = `sysctl -n hw.memsize`.to_i / 1024
+  elsif host =~ /linux/
+    mem = `grep 'MemTotal' /proc/meminfo | sed -e 's/MemTotal://' -e 's/ kB//'`.to_i
+  elsif host =~ /mswin|mingw|cygwin/
+    mem = `wmic computersystem Get TotalPhysicalMemory`.split[1].to_i / 1024
+  end
   [:virtualbox, :libvirt].each do |provider|
   config.vm.provider provider do |p|
       p.cpus = ENV["CPUS"] || 2
-      p.memory = ENV['MEMORY'] || 6144
+      p.memory = ENV['MEMORY'] || mem / 1024 / 4
     end
   end
 
