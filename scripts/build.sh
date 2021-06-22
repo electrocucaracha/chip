@@ -28,18 +28,27 @@ else
 fi
 
 pushd "$chip_src"
-rm -rf out/
+sudo rm -rf out/
 popd
 
 bootstrap
-init
-trap cleanup EXIT
+for build_type in gcc_debug gcc_release clang mbedtls clang_experimental; do
+    init "$build_type"
+    trap cleanup EXIT
 
-# Use gn to generate Ninja files
-run ./scripts/build/gn_gen.sh --args='is_debug=false'
+    case "$build_type" in
+        "gcc_debug") GN_ARGS='chip_config_memory_debug_checks=true chip_config_memory_debug_dmalloc=true';;
+        "gcc_release") GN_ARGS='is_debug=false';;
+        "clang") GN_ARGS='is_clang=true';;
+        "mbedtls") GN_ARGS='chip_crypto="mbedtls"';;
+    esac
 
-# Build source code
-run ./scripts/build/gn_build.sh
+    # Use gn to generate Ninja files
+    run ./scripts/build/gn_gen.sh --args="$GN_ARGS"
 
-# Run Tests
-run ./scripts/tests/gn_tests.sh
+    # Build source code
+    run ./scripts/build/gn_build.sh
+
+    # Run Tests
+    run ./scripts/tests/gn_tests.sh
+done

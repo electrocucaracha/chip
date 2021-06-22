@@ -24,8 +24,9 @@ function bootstrap {
 }
 
 function init {
+    cleanup
     $DOCKER_CMD run -ti --rm --name builder -d \
-    --env BUILD_TYPE=gcc_release \
+    --env BUILD_TYPE="$1" \
     -w "$chip_src" \
     -v "${chip_src}:${chip_src}" \
     --sysctl "net.ipv6.conf.all.disable_ipv6=0 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
@@ -37,5 +38,8 @@ function run {
 }
 
 function cleanup {
-    $DOCKER_CMD kill builder
+    if [[ -n "$($DOCKER_CMD ps -aqf "name=builder")" ]]; then
+        $DOCKER_CMD kill builder
+        sleep 5
+    fi
 }
