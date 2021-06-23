@@ -16,6 +16,8 @@ fi
 
 # shellcheck source=./scripts/common.sh
 source common.sh
+# shellcheck source=./scripts/assertions.sh
+source assertions.sh
 
 if [ ! -d "$chip_src" ]; then
     sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
@@ -48,6 +50,11 @@ for build_type in gcc_debug gcc_release clang mbedtls clang_experimental; do
 
     # Build source code
     run ./scripts/build/gn_build.sh
+
+    # Verify binaries creation
+    for bin in echo-requester echo-responder im-initiator im-responder shell tool; do
+        assert_file_exists "$chip_src/out/$build_type/chip-$bin"
+    done
 
     # Run Tests
     run ./scripts/tests/gn_tests.sh

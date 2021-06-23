@@ -17,12 +17,29 @@ fi
 chip_src="/opt/connectedhomeip"
 DOCKER_CMD="sudo $(command -v docker)"
 
+# info() - This function prints an information message in the standard output
+function info {
+    _print_msg "INFO" "$1"
+}
+
+# error() - This function prints an error message in the standard output
+function error {
+    _print_msg "ERROR" "$1"
+    exit 1
+}
+
+function _print_msg {
+    echo "$(date +%H:%M:%S) - $1: $2"
+}
+
+# bootstrap() - Creates the docker builder image used during the compilation
 function bootstrap {
     pushd "${chip_src}/integrations/docker/images/chip-build"
     $DOCKER_CMD build --build-arg VERSION="$(cat version)" -t chip-builder .
     popd
 }
 
+# init() - Initializes a builder container
 function init {
     cleanup
     $DOCKER_CMD run -ti --rm --name builder -d \
@@ -33,10 +50,12 @@ function init {
     chip-builder
 }
 
+# run() - Executes a command on a running builder container
 function run {
     $DOCKER_CMD exec builder sh -c "$@"
 }
 
+# cleanup() - Destroy an existing builder container
 function cleanup {
     if [[ -n "$($DOCKER_CMD ps -aqf "name=builder")" ]]; then
         $DOCKER_CMD kill builder
