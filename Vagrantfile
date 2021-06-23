@@ -56,7 +56,9 @@ Vagrant.configure("2") do |config|
     v.gui = false
   end
 
-  config.vm.provider :libvirt do |v|
+  config.vm.provider :libvirt do |v, override|
+    override.vm.synced_folder "./scripts", "/vagrant", type: 'nfs', SharedFoldersEnableSymlinksCreate: false
+    override.vm.synced_folder "./opt", "/opt", type: 'nfs', create: true
     v.random_hostname = true
     v.management_network_address = "10.0.2.0/24"
     v.management_network_name = "administration"
