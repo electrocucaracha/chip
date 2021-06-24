@@ -45,7 +45,7 @@ Vagrant.configure('2') do |config|
 
       cd /vagrant/
       curl -fsSL http://bit.ly/install_pkg | PKG=docker bash
-      ./build.sh | tee ~/build.log
+      ./check.sh | tee ~/check.log
     SHELL
   end
 

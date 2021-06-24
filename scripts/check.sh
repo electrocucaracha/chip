@@ -18,6 +18,8 @@ fi
 source common.sh
 # shellcheck source=./scripts/assertions.sh
 source assertions.sh
+# shellcheck source=./scripts/tests.sh
+source tests.sh
 
 if [ ! -d "$chip_src" ]; then
     sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
@@ -29,14 +31,19 @@ else
     popd
 fi
 
-pushd "$chip_src"
-sudo rm -rf out/
-popd
+function cleanup {
+    info "Cleaning previous execution"
+    cleanup_containers
+    cleanup_images
+    pushd "$chip_src"
+    sudo rm -rf out/
+    popd
+}
 
+trap cleanup EXIT
 bootstrap
 for build_type in gcc_debug gcc_release clang mbedtls clang_experimental; do
     init "$build_type"
-    trap cleanup EXIT
 
     case "$build_type" in
         "gcc_debug") GN_ARGS='chip_config_memory_debug_checks=true chip_config_memory_debug_dmalloc=true';;
@@ -52,10 +59,28 @@ for build_type in gcc_debug gcc_release clang mbedtls clang_experimental; do
     run ./scripts/build/gn_build.sh
 
     # Verify binaries creation
-    for bin in echo-requester echo-responder im-initiator im-responder shell tool; do
-        assert_file_exists "$chip_src/out/$build_type/chip-$bin"
-    done
+    run_file_asserts "$chip_src/out/$build_type"
 
-    # Run Tests
+    # Run Unit Tests
     run ./scripts/tests/gn_tests.sh
+
+    # Run Integration Tests
+    bootstrap_int_test "$build_type"
+
+    # Echo - Functional Test
+    run_int_test "$build_type" echo-responder echo-requester
+
+    run_common_asserts 3
+    info "Running Echo assertions"
+    assert_contains responder "Listening for Echo requests..."
+    assert_count_equal requester "Send echo request message to Node:" 3
+    assert_count_equal responder "sending response." 3
+
+    # IM - Functional Test
+    run_int_test "$build_type" im-responder im-initiator
+
+    run_common_asserts 10
+    info "Running IM assertions"
+    assert_contains responder "Listening for IM requests..."
+    assert_count_equal requester "Sending secure msg on generic transport" 20
 done

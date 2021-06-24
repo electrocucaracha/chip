@@ -41,7 +41,8 @@ function bootstrap {
 
 # init() - Initializes a builder container
 function init {
-    cleanup
+    cleanup_containers
+
     $DOCKER_CMD run -ti --rm --name builder -d \
     --env BUILD_TYPE="$1" \
     -w "$chip_src" \
@@ -55,10 +56,29 @@ function run {
     $DOCKER_CMD exec builder sh -c "$@"
 }
 
-# cleanup() - Destroy an existing builder container
-function cleanup {
-    if [[ -n "$($DOCKER_CMD ps -aqf "name=builder")" ]]; then
-        $DOCKER_CMD kill builder
-        sleep 5
-    fi
+# cleanup_images() - Remove previous docker images
+function cleanup_images {
+    for img in $($DOCKER_CMD images -f reference="chip-*" -q); do
+        $DOCKER_CMD rmi -f "$img"
+    done
+}
+
+# cleanup_containers() - Destroy builder and functional test containers
+function cleanup_containers {
+    max_attempts=5
+
+    for container in $($DOCKER_CMD ps -aq); do
+        pid=$($DOCKER_CMD inspect --format '{{.State.Pid}}' "$container")
+        $DOCKER_CMD kill "$container" ||:
+        if [ "${pid:-0}" != "0" ]; then
+            until [ -z "$(ps -p "$pid" -o comm=)" ]; do
+                if [ "${attempt_counter}" -eq "${max_attempts}" ];then
+                    error "Max attempts reached"
+                fi
+                attempt_counter=$((attempt_counter+1))
+                sleep $((attempt_counter*2))
+            done
+        fi
+        $DOCKER_CMD rm "$container" ||:
+    done
 }
