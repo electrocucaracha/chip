@@ -10,7 +10,13 @@
 
 name: Check build process
 # yamllint disable-line rule:truthy
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
 
 jobs:
   check-ci-baremetal:
@@ -23,8 +29,10 @@ jobs:
         run: cd scripts; ./check.sh
   check-e2e:
     runs-on: macos-10.15
-    env:
-      VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        script: [build]
     steps:
       - uses: actions/checkout@v2
       - name: Cache Vagrant boxes
@@ -40,3 +48,7 @@ jobs:
           find . -type f -name "*.bak" -delete
       - name: Create instance
         run: vagrant up
+        env:
+          VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+          FUNCTIONAL_TEST_ENABLED: true
+          CHIP_CI_SCRIPT: ${{ matrix.script }}

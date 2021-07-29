@@ -16,7 +16,9 @@ no_proxy = ENV['NO_PROXY'] || ENV['no_proxy'] || '127.0.0.1,localhost'
 (1..254).each do |i|
   no_proxy += ",10.0.2.#{i}"
 end
-debug = ENV['DEBUG'] || 'true'
+debug = ENV['DEBUG']
+functional_test_enabled = ENV['FUNCTIONAL_TEST_ENABLED']
+chip_ci_script = ENV['CHIP_CI_SCRIPT']
 
 case host
 when /darwin/
@@ -38,7 +40,9 @@ Vagrant.configure('2') do |config|
 
   config.vm.provision 'shell', privileged: false do |sh|
     sh.env = {
-      'DEBUG': debug.to_s
+      'DEBUG': debug.to_s,
+      'FUNCTIONAL_TEST_ENABLED': functional_test_enabled.to_s,
+      'CHIP_CI_SCRIPT': chip_ci_script.to_s
     }
     sh.inline = <<-SHELL
       set -o errexit
