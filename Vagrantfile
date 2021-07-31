@@ -19,6 +19,7 @@ end
 debug = ENV['DEBUG']
 functional_test_enabled = ENV['FUNCTIONAL_TEST_ENABLED']
 chip_ci_script = ENV['CHIP_CI_SCRIPT']
+chip_build_image = ENV['CHIP_BUILD_IMAGE']
 
 case host
 when /darwin/
@@ -42,10 +43,13 @@ Vagrant.configure('2') do |config|
     sh.env = {
       'DEBUG': debug.to_s,
       'FUNCTIONAL_TEST_ENABLED': functional_test_enabled.to_s,
-      'CHIP_CI_SCRIPT': chip_ci_script.to_s
+      'CHIP_CI_SCRIPT': chip_ci_script.to_s,
+      'CHIP_BUILD_IMAGE': chip_build_image.to_s
     }
     sh.inline = <<-SHELL
       set -o errexit
+
+      echo "export CHIP_DEV_MODE=true" | sudo tee --append /etc/environment
 
       cd /vagrant/
       curl -fsSL http://bit.ly/install_pkg | PKG=docker bash
@@ -55,7 +59,7 @@ Vagrant.configure('2') do |config|
 
   %i[virtualbox libvirt].each do |provider|
     config.vm.provider provider do |p|
-      p.cpus = ENV['CPUS'] || 2
+      p.cpus = ENV['CPUS'] || 3
       p.memory = ENV['MEMORY'] || mem / 1024 / 4
     end
   end

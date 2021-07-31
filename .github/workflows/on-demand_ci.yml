@@ -8,7 +8,7 @@
 # http://www.apache.org/licenses/LICENSE-2.0
 ##############################################################################
 
-name: Check build process
+name: Check CI process
 # yamllint disable-line rule:truthy
 on:
   push:
@@ -27,6 +27,27 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build source code
         run: cd scripts; ./check.sh
+  check-ci-vm:
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache Vagrant boxes
+        uses: actions/cache@v2
+        with:
+          path: ~/.vagrant.d/boxes
+          key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
+          restore-keys: |
+            ${{ runner.os }}-vagrant-
+      - name: Replace shorten links
+        run: |
+          find . -type f -not -path ./.github/\* -exec sed -i '.bak' 's|http://bit.ly/install_pkg|https://raw.githubusercontent.com/electrocucaracha/pkg-mgr_scripts/master/install.sh|g' {} \;
+          find . -type f -name "*.bak" -delete
+      - name: Create instance
+        run: vagrant up
+        env:
+          VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+          CPUS: 3
+          MEMORY: 12288
   check-e2e:
     runs-on: macos-10.15
     strategy:
@@ -50,5 +71,8 @@ jobs:
         run: vagrant up
         env:
           VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+          CPUS: 3
+          MEMORY: 12288
           FUNCTIONAL_TEST_ENABLED: true
           CHIP_CI_SCRIPT: ${{ matrix.script }}
+          CHIP_BUILD_IMAGE: true
