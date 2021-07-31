@@ -16,6 +16,13 @@ fi
 
 chip_src="/opt/connectedhomeip"
 DOCKER_CMD="sudo $(command -v docker)"
+mgmt_nic="$(ip route get 1.1.1.1 | awk 'NR==1 { print $5 }')"
+ratio=$((1024*1024)) # MB
+msg="Summary \n"
+start=$(date +%s)
+if [ -f "/sys/class/net/$mgmt_nic/statistics/rx_bytes" ]; then
+    rx_bytes_before=$(cat "/sys/class/net/$mgmt_nic/statistics/rx_bytes")
+fi
 
 # info() - This function prints an information message in the standard output
 function info {
@@ -32,11 +39,37 @@ function _print_msg {
     echo "$(date +%H:%M:%S) - $1: $2"
 }
 
-# bootstrap() - Creates the docker builder image used during the compilation
 function bootstrap {
-    pushd "${chip_src}/integrations/docker/images/chip-build"
-    $DOCKER_CMD build --build-arg VERSION="$(cat version)" -t chip-builder .
-    popd
+    _init_src
+    _print_stats
+    _init_img
+    _print_stats
+}
+
+function _init_src {
+    if [ ! -d "$chip_src" ]; then
+        info "Cloning Connnected Home IP source code"
+        sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
+        sudo chown -R "$USER": "$chip_src"
+    else
+        info "Updating Connnected Home IP source code"
+        pushd "$chip_src"
+        git submodule update --init
+        git pull origin master
+        popd
+    fi
+}
+
+function _init_img {
+    if [[ "${CHIP_BUILD_IMAGE:-false}" == "true" ]]; then
+        info "Building Connnected Home IP builder image"
+        pushd "${chip_src}/integrations/docker/images/chip-build"
+        $DOCKER_CMD build --build-arg VERSION="$(cat version)" -t connectedhomeip/chip-build .
+        popd
+    else
+        info "Pulling Connnected Home IP builder image"
+        $DOCKER_CMD pull connectedhomeip/chip-build
+    fi
 }
 
 # init() - Initializes a builder container
@@ -48,11 +81,12 @@ function init {
     -w "$chip_src" \
     -v "${chip_src}:${chip_src}" \
     --sysctl "net.ipv6.conf.all.disable_ipv6=0 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
-    chip-builder
+    connectedhomeip/chip-build
 }
 
 # run() - Executes a command on a running builder container
 function run {
+    info "Running inside of the container - $*"
     $DOCKER_CMD exec builder sh -c "$@"
 }
 
@@ -81,4 +115,34 @@ function cleanup_containers {
         fi
         $DOCKER_CMD rm "$container" ||:
     done
+}
+
+function _print_stats {
+    if [ -f "/sys/class/net/$mgmt_nic/statistics/rx_bytes" ]; then
+        rx_bytes_after=$(cat "/sys/class/net/$mgmt_nic/statistics/rx_bytes")
+    fi
+    echo "=== Statistics ==="
+    echo "Duration time: $(($(date +%s)-start)) secs"
+    if [ -n "${rx_bytes_before:-}" ] && [ -n "${rx_bytes_after:-}" ]; then
+        echo "Network usage: $(((rx_bytes_after-rx_bytes_before)/ratio)) MB"
+    fi
+}
+
+function _print_summary {
+    echo -e "$msg\n"
+    _print_stats
+}
+
+# cleanup() - Print
+function cleanup {
+    _print_summary
+
+    info "Cleaning previous execution"
+    cleanup_containers
+    if [[ "${CHIP_DEV_MODE:-false}" == "false" ]]; then
+        cleanup_images
+    fi
+    pushd "$chip_src"
+    sudo rm -rf out/
+    popd
 }
