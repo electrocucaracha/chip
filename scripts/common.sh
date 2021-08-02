@@ -46,18 +46,41 @@ function bootstrap {
     _print_stats
 }
 
+function _git_timed {
+    local count=0
+    local timeout=0
+
+    if [[ -n "${GIT_TIMEOUT}" ]]; then
+        timeout=${GIT_TIMEOUT}
+    fi
+
+    until timeout -s SIGINT "${timeout}" sudo git "$@"; do
+        # 124 is timeout(1)'s special return code when it reached the
+        # timeout; otherwise assume fatal failure
+        if [[ $? -ne 124 ]]; then
+            info "git call failed: [git $*]"
+        fi
+
+        if [ $count -eq 3 ]; then
+            error "Maximum of 3 git retries reached"
+        fi
+        count=$((count+1))
+        sleep $((count*5))
+    done
+}
+
 function _init_src {
     if [ ! -d "$chip_src" ]; then
         info "Cloning Connnected Home IP source code"
-        sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
+        _git_timed clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
         sudo chown -R "$USER": "$chip_src"
-    else
-        info "Updating Connnected Home IP source code"
-        pushd "$chip_src"
-        git submodule update --init
-        git pull origin master
-        popd
     fi
+
+    info "Updating Connnected Home IP source code"
+    pushd "$chip_src"
+    _git_timed submodule update --init
+    _git_timed pull origin master
+    popd
 }
 
 function _init_img {
@@ -113,7 +136,7 @@ function cleanup_containers {
                 sleep $((attempt_counter*2))
             done
         fi
-        $DOCKER_CMD rm "$container" ||:
+        $DOCKER_CMD rm -f "$container" ||:
     done
 }
 

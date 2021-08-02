@@ -17,15 +17,5 @@ fi
 # shellcheck source=./scripts/common.sh
 source common.sh
 
-if [ ! -d "$chip_src" ]; then
-    sudo git clone --depth 1 --recurse-submodules https://github.com/project-chip/connectedhomeip "$chip_src"
-    sudo chown -R "$USER": "$chip_src"
-else
-    pushd "$chip_src"
-    git submodule update --init
-    git pull origin master
-    popd
-fi
-
 bootstrap
 "./${CHIP_CI_SCRIPT:-build}.sh"
