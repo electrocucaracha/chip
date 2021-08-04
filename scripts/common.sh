@@ -110,7 +110,17 @@ function init {
 # run() - Executes a command on a running builder container
 function run {
     info "Running inside of the container - $*"
-    $DOCKER_CMD exec builder sh -c "$@"
+    $DOCKER_CMD exec builder bash -c "set -o pipefail; set -o errexit; $*"
+}
+
+# copy() - Copies the files of the running builder container
+function copy {
+    src_path="$1"
+    dest_path="/tmp/$(basename "$src_path")"
+
+    sudo rm -rf "$dest_path"
+    $DOCKER_CMD cp "builder:$src_path" "/tmp"
+    sudo chown -R "$USER": "$dest_path"
 }
 
 # cleanup_images() - Remove previous docker images
@@ -122,12 +132,15 @@ function cleanup_images {
 
 # cleanup_containers() - Destroy builder and functional test containers
 function cleanup_containers {
-    max_attempts=5
+    local max_attempts=5
+    local wait_time=10
 
     for container in $($DOCKER_CMD ps -aq); do
         pid=$($DOCKER_CMD inspect --format '{{.State.Pid}}' "$container")
-        $DOCKER_CMD kill "$container" ||:
+        info "Stoping $container container"
+        $DOCKER_CMD stop --time "$wait_time" "$container" ||:
         if [ "${pid:-0}" != "0" ]; then
+            info "Waiting for pid $pid"
             until [ -z "$(ps -p "$pid" -o comm=)" ]; do
                 if [ "${attempt_counter}" -eq "${max_attempts}" ];then
                     error "Max attempts reached"
@@ -136,6 +149,8 @@ function cleanup_containers {
                 sleep $((attempt_counter*2))
             done
         fi
+        sleep "$wait_time"
+        info "Removing $container container"
         $DOCKER_CMD rm -f "$container" ||:
     done
 }
@@ -154,18 +169,4 @@ function _print_stats {
 function _print_summary {
     echo -e "$msg\n"
     _print_stats
-}
-
-# cleanup() - Print
-function cleanup {
-    _print_summary
-
-    info "Cleaning previous execution"
-    cleanup_containers
-    if [[ "${CHIP_DEV_MODE:-false}" == "false" ]]; then
-        cleanup_images
-    fi
-    pushd "$chip_src"
-    sudo rm -rf out/
-    popd
 }

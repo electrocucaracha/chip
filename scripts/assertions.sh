@@ -57,34 +57,3 @@ function assert_count_equal {
         error "${4:-"The $1 logs don't have $expected string matches"}"
     fi
 }
-
-# run_common_asserts() - This functions verifies that binaries were created properly
-function run_file_asserts {
-    output_path="$1"
-
-    info "Verifying binaries creation"
-
-    for bin in echo-requester echo-responder im-initiator im-responder shell tool; do
-        assert_file_exists "$output_path/chip-$bin"
-    done
-}
-
-# run_common_asserts() - This function runs multiple common assertions
-function run_common_asserts {
-    msg_counter=$1
-
-    info "Running Common assertions"
-
-    assert_non_empty requester
-    assert_contains requester "Establish secure session succeeded"
-    assert_contains responder "Secure transport received message destined to"
-    assert_contains responder "Setting fabricID"
-
-    assert_count_equal responder "Received message of type" "$((msg_counter*2))"
-    assert_count_equal requester "Secure msg send status No Error" "$((msg_counter*2))"
-    assert_count_equal responder "Secure msg send status No Error" "$msg_counter"
-
-    assert_contains requester "Inet Layer shutdown"
-    assert_contains requester "BLE layer shutdown"
-    assert_contains requester "System Layer shutdown"
-}
