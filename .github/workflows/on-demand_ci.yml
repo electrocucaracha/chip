@@ -46,6 +46,7 @@ jobs:
         run: vagrant up
         env:
           VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+          VAGRANT_EXPERIMENTAL: disks
           CPUS: 3
           MEMORY: 12288
   check-e2e:
@@ -71,6 +72,7 @@ jobs:
         run: vagrant up
         env:
           VAGRANT_DISABLE_VBOXSYMLINKCREATE: 1
+          VAGRANT_EXPERIMENTAL: disks
           CPUS: 3
           MEMORY: 12288
           FUNCTIONAL_TEST_ENABLED: true

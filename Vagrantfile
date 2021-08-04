@@ -38,6 +38,17 @@ Vagrant.configure('2') do |config|
   config.vm.box_check_update = false
   config.vm.synced_folder './scripts', '/vagrant', SharedFoldersEnableSymlinksCreate: false
   config.vm.synced_folder './opt', '/opt', create: true
+  config.vm.disk :disk, name: "src", size: "15GB"
+  config.vm.disk :disk, name: "img", size: "7GB"
+  {
+    "sdb" => "/opt/",
+    "sdc" => "/var/lib/docker/",
+  }.each do |device, mount_path|
+    config.vm.provision "shell" do |s|
+      s.path   = "pre-install.sh"
+      s.args   = [device, mount_path]
+    end
+  end
 
   config.vm.provision 'shell', privileged: false do |sh|
     sh.env = {
@@ -71,6 +82,10 @@ Vagrant.configure('2') do |config|
   config.vm.provider :libvirt do |v, override|
     override.vm.synced_folder './scripts', '/vagrant', type: 'nfs', SharedFoldersEnableSymlinksCreate: false
     override.vm.synced_folder './opt', '/opt', type: 'nfs', create: true
+    v.disk_device = "sda"
+    v.disk_bus = "sata"
+    v.storage :file, bus: "sata", device: "sdb", size: "15G"
+    v.storage :file, bus: "sata", device: "sdc", size: "7G"
     v.random_hostname = true
     v.management_network_address = '10.0.2.0/24'
     v.management_network_name = 'administration'

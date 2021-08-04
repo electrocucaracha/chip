@@ -26,7 +26,7 @@ supports two Virtualization providers (Libvirt and VirtualBox).
 Once Vagrant is installed, it's possible to deploy a dev environment
 with the following instruction:
 
-    vagrant up
+    VAGRANT_EXPERIMENTAL=disks vagrant up
 
 [1]: https://www.connectedhomeip.com/
 [2]: https://github.com/project-chip/connectedhomeip/blob/master/docs/BUILDING.md
