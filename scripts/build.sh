@@ -18,8 +18,8 @@ fi
 source common.sh
 # shellcheck source=./scripts/assertions.sh
 source assertions.sh
-# shellcheck source=./scripts/tests.sh
-source tests.sh
+# shellcheck source=./scripts/_int_tests.sh
+source _int_tests.sh
 
 # run_common_asserts() - This functions verifies that binaries were created properly
 function run_file_asserts {
@@ -52,23 +52,20 @@ function run_common_asserts {
     assert_contains requester "System Layer shutdown"
 }
 
-# cleanup() - Print
-function cleanup {
-    _print_summary
-
-    info "Cleaning previous execution"
+function _init {
     cleanup_containers
-    if [[ "${CHIP_DEV_MODE:-false}" == "false" ]]; then
-        cleanup_images
-    fi
-    pushd "$chip_src"
-    sudo rm -rf out/
-    popd
+
+    $DOCKER_CMD run -ti --rm --name builder -d \
+    --env BUILD_TYPE="$1" \
+    -w "$chip_src" \
+    -v "${chip_src}:${chip_src}" \
+    --sysctl "net.ipv6.conf.all.disable_ipv6=0 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
+    connectedhomeip/chip-build
 }
 
 trap cleanup EXIT
 for build_type in gcc_debug gcc_release clang mbedtls; do
-    init "$build_type"
+    _init "$build_type"
 
     case "$build_type" in
         "gcc_debug") GN_ARGS='chip_config_memory_debug_checks=true chip_config_memory_debug_dmalloc=true';;
@@ -82,20 +79,20 @@ for build_type in gcc_debug gcc_release clang mbedtls; do
 
     # Use gn to generate Ninja files
     run "./scripts/build/gn_gen.sh --args='$GN_ARGS'"
-    msg+="- Ninja files generated successfully for $build_type\n"
+    add_msg "Ninja files generated successfully for $build_type"
 
     # Build source code
     run ./scripts/build/gn_build.sh
-    msg+="- $build_type build was successfully\n"
+    add_msg "$build_type build was successfully"
     copy "$chip_src/out/$build_type"
 
     # Verify binaries creation
     run_file_asserts "/tmp/$build_type"
-    msg+="- $build_type assertions were passed successfully\n"
+    add_msg "$build_type assertions were passed successfully"
 
     # Run Unit Tests
     run ./scripts/tests/gn_tests.sh
-    msg+="- $build_type passed their unit tests\n"
+    add_msg "$build_type passed their unit tests"
 
     if [[ "${FUNCTIONAL_TEST_ENABLED:-false}" == "true" ]]; then
         # Run Integration Tests
@@ -109,7 +106,7 @@ for build_type in gcc_debug gcc_release clang mbedtls; do
         assert_contains responder "Listening for Echo requests..."
         assert_count_equal requester "Send echo request message to Node:" 3
         assert_count_equal responder "sending response." 3
-        msg+="- INFO: $build_type passed echo functional test\n"
+        add_msg "$build_type passed echo functional test"
 
         # IM - Functional Test
         run_int_test "$build_type" im-responder im-initiator
@@ -118,6 +115,7 @@ for build_type in gcc_debug gcc_release clang mbedtls; do
         info "Running IM assertions"
         assert_contains responder "Listening for IM requests..."
         assert_count_equal requester "Sending secure msg on generic transport" 20
-        msg+="- INFO: $build_type passed IM functional test\n"
+        add_msg "$build_type passed IM functional test"
     fi
+    print_stats
 done

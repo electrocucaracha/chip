@@ -41,9 +41,14 @@ function _print_msg {
 
 function bootstrap {
     _init_src
-    _print_stats
+    print_stats
     _init_img
-    _print_stats
+    print_stats
+}
+
+# add_msg() - Add a bullet into the summary
+function add_msg {
+    msg+="- [$(date +%H:%M:%S)] $1\n"
 }
 
 function _git_timed {
@@ -95,17 +100,6 @@ function _init_img {
     fi
 }
 
-# init() - Initializes a builder container
-function init {
-    cleanup_containers
-
-    $DOCKER_CMD run -ti --rm --name builder -d \
-    --env BUILD_TYPE="$1" \
-    -w "$chip_src" \
-    -v "${chip_src}:${chip_src}" \
-    --sysctl "net.ipv6.conf.all.disable_ipv6=0 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
-    connectedhomeip/chip-build
-}
 
 # run() - Executes a command on a running builder container
 function run {
@@ -155,7 +149,8 @@ function cleanup_containers {
     done
 }
 
-function _print_stats {
+# print_stats() - Print system statistics
+function print_stats {
     if [ -f "/sys/class/net/$mgmt_nic/statistics/rx_bytes" ]; then
         rx_bytes_after=$(cat "/sys/class/net/$mgmt_nic/statistics/rx_bytes")
     fi
@@ -168,5 +163,17 @@ function _print_stats {
 
 function _print_summary {
     echo -e "$msg\n"
-    _print_stats
+    print_stats
 }
+
+# cleanup() - Remove running containers
+function cleanup {
+    _print_summary
+
+    info "Cleaning previous execution"
+    cleanup_containers
+    if [[ "${CHIP_DEV_MODE:-false}" == "false" ]]; then
+        cleanup_images
+    fi
+}
+

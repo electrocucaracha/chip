@@ -16,33 +16,47 @@ fi
 
 # shellcheck source=./scripts/common.sh
 source common.sh
+# shellcheck source=./scripts/assertions.sh
+source assertions.sh
+# shellcheck source=./scripts/_int_tests.sh
+source _int_tests.sh
 
-# bootstrap_int_test() - Packages the binaries into docker containers
-function bootstrap_int_test {
-    local build_type="$1"
-
-    dockerfile_path="$(realpath Dockerfile)"
-    pushd "${chip_src}/out/${build_type}"
-    $DOCKER_CMD build -t "chip-${build_type}" -f "$dockerfile_path" .
-    popd
-}
-
-# run_int_test() - Runs an Integration test
-function run_int_test {
-    local build_type="$1"
-    local responder="$2"
-    local requester="$3"
-    attempt_counter=0
-    max_attempts=5
-
+function _init {
     cleanup_containers
-    $DOCKER_CMD run -d --net host --rm --name responder "chip-${build_type}" "./chip-$responder"
-    until $DOCKER_CMD logs responder | grep -q "New pairing for device"; do
-        if [ ${attempt_counter} -eq ${max_attempts} ];then
-            error "Max attempts reached"
-        fi
-        attempt_counter=$((attempt_counter+1))
-        sleep $((attempt_counter*2))
-    done
-    $DOCKER_CMD run --net host --name requester "chip-${build_type}" "./chip-$requester" 127.0.0.1 > /dev/null
+
+    $DOCKER_CMD run -ti --rm --name builder -d \
+    -w "$chip_src" \
+    -v "${chip_src}:${chip_src}" \
+    --sysctl "net.ipv6.conf.all.disable_ipv6=0 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
+    connectedhomeip/chip-build
 }
+
+trap cleanup EXIT
+for eventloop in eventloop_same eventloop_separate; do
+    _init
+
+    # Bootstrap
+    run ./scripts/build/gn_bootstrap.sh
+
+    # Build all clusters app
+    run "scripts/examples/gn_build_example.sh examples/all-clusters-app/linux out/debug/standalone/ chip_config_network_layer_ble=false is_tsan=true"
+    add_msg "All cluster apps were built successfully"
+
+    # Build TV app
+    run "scripts/examples/gn_build_example.sh examples/tv-app/linux out/debug/standalone/ chip_config_network_layer_ble=false is_tsan=true"
+    add_msg "TV app was built sucessfully"
+
+    # Build chip-tool
+    USE_SEPARATE_EVENTLOOP=$([[ $eventloop == "eventloop_separate" ]] && echo "true" || echo "false")
+    run "scripts/examples/gn_build_example.sh examples/chip-tool out/debug/standalone/ is_tsan=true config_use_separate_eventloop=${USE_SEPARATE_EVENTLOOP} config_pair_with_random_id=false"
+    add_msg "CHIP tool built sucessfully(USE_SEPARATE_EVENTLOOP=$USE_SEPARATE_EVENTLOOP)"
+
+    # Run Tests
+    run "scripts/tests/test_suites.sh"
+    add_msg "Test suites ran sucessfully"
+
+    run "scripts/tests/test_suites.sh -a tv"
+    add_msg "TV Test suites ran sucessfully"
+
+    print_stats
+done

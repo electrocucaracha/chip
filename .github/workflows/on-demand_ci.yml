@@ -21,18 +21,24 @@ on:
 jobs:
   check-ci-baremetal:
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        script: [build, tests]
     env:
       DEBUG: true
     steps:
       - uses: actions/checkout@v2
       - name: Build source code
         run: cd scripts; ./check.sh
+        env:
+          CHIP_CI_SCRIPT: ${{ matrix.script }}
   check-e2e:
     runs-on: macos-10.15
     strategy:
       fail-fast: false
       matrix:
-        script: [build]
+        script: [build, tests]
     steps:
       - uses: actions/checkout@v2
       - name: Cache Vagrant boxes
